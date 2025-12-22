@@ -1,0 +1,32 @@
+{
+  "name": "better-auth-backend",
+  "version": "1.0.0",
+  "description": "Better Auth backend with Neon DB for physical-ai-and-humanoid-robotics textbook",
+  "main": "api-server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node api-server.mjs",
+    "dev": "nodemon api-server.mjs",
+    "vercel-build": "echo 'No build required'"
+  },
+  "dependencies": {
+    "better-auth": "^1.4.7",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "cookie-parser": "^1.4.6",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "better-auth",
+    "neon-db",
+    "authentication",
+    "nodejs",
+    "express"
+  ],
+  "author": "Physical AI and Humanoid Robotics Team",
+  "license": "MIT"
+}

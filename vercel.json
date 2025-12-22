@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api-server.mjs",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api-server.mjs"
+    }
+  ],
+  "functions": {
+    "api-server.mjs": {
+      "includeFiles": "lib/**"
+    }
+  }
+}
