@@ -1,20 +1,15 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api-server.mjs",
-      "use": "@vercel/node"
+  "functions": {
+    "api-server.mjs": {
+      "runtime": "vercel-nodejs@20.x",
+      "includeFiles": "lib/**"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/(.*)",
       "dest": "api-server.mjs"
     }
-  ],
-  "functions": {
-    "api-server.mjs": {
-      "includeFiles": "lib/**"
-    }
-  }
+  ]
 }
