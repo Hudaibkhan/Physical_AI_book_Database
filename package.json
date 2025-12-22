@@ -1,21 +1,26 @@
 {
   "name": "better-auth-backend",
-  "version": "1.0.0",
-  "description": "Better Auth backend with Neon DB for physical-ai-and-humanoid-robotics textbook",
+  "version": "2.0.0",
+  "description": "Production-ready auth backend with Better Auth, Express, and PostgreSQL - Secure, scalable, and fully documented",
   "main": "api-server.mjs",
   "type": "module",
   "scripts": {
-    "start": "node api-server.mjs",
-    "dev": "nodemon api-server.mjs",
-    "vercel-build": "echo 'No build required'"
+    "start": "NODE_ENV=production node api-server.mjs",
+    "dev": "NODE_ENV=development nodemon api-server.mjs",
+    "vercel-build": "echo 'No build required'",
+    "test:health": "curl http://localhost:8000/api/health || echo 'Server not running'",
+    "migrate": "psql $DATABASE_URL -f migrations/001_better_auth_core.sql && psql $DATABASE_URL -f migrations/002_user_profiles.sql"
   },
   "dependencies": {
     "better-auth": "^1.4.7",
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
     "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
     "pg": "^8.11.3",
-    "dotenv": "^16.3.1"
+    "winston": "^3.19.0"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -25,7 +30,17 @@
     "neon-db",
     "authentication",
     "nodejs",
-    "express"
+    "express",
+    "postgresql",
+    "jwt",
+    "session-management",
+    "rate-limiting",
+    "security",
+    "helmet",
+    "winston",
+    "production-ready",
+    "serverless",
+    "vercel"
   ],
   "author": "Physical AI and Humanoid Robotics Team",
   "license": "MIT"

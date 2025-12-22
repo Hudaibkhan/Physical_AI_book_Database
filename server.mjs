@@ -1,0 +1,170 @@
+/**
+ * Production-Ready Express Server
+ *
+ * Compatible with both local development and Vercel serverless deployment.
+ * Includes security headers, CORS, rate limiting, and structured logging.
+ */
+
+// Load and validate environment variables first
+import './load-env.js';
+import { validateEnv } from './lib/env-validator.mjs';
+import { logger, requestLogger, setupErrorHandlers } from './lib/logger.mjs';
+
+// Validate environment before starting
+try {
+  validateEnv();
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
+// Setup error handlers
+setupErrorHandlers();
+
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import createApiRouter from './utils/api-handler.mjs';
+
+/**
+ * CORS origin validator
+ * Supports multiple origins from ALLOWED_ORIGINS env variable
+ */
+function corsOriginValidator(origin, callback) {
+  // Allow requests with no origin (mobile apps, Postman, etc.)
+  if (!origin) {
+    return callback(null, true);
+  }
+
+  // Get allowed origins from env
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : [process.env.FRONTEND_URL];
+
+  // Check if origin is allowed
+  if (allowedOrigins.includes(origin)) {
+    callback(null, true);
+  } else {
+    logger.warn('CORS blocked request', { origin });
+    callback(new Error('Not allowed by CORS'));
+  }
+}
+
+/**
+ * Create the Express app with all middleware
+ */
+const createApp = () => {
+  const app = express();
+
+  // Trust proxy (required for rate limiting and IP detection behind Vercel)
+  app.set('trust proxy', 1);
+
+  // Security headers using helmet
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true
+    },
+    frameguard: {
+      action: 'deny' // Prevent clickjacking
+    },
+    noSniff: true, // Prevent MIME type sniffing
+    xssFilter: true, // Enable XSS filter
+  }));
+
+  // CORS middleware with dynamic origin validation
+  app.use(cors({
+    origin: corsOriginValidator,
+    credentials: true,  // CRITICAL: Allow cookies to be sent
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset']
+  }));
+
+  // Request logging
+  app.use(requestLogger);
+
+  // Use the API router that contains all the routes
+  app.use('/api', createApiRouter());
+
+  // Root health check endpoint
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'Book RAG Agent API with Better Auth',
+      status: 'running',
+      version: '2.0.0',
+      documentation: '/api'
+    });
+  });
+
+  // 404 handler
+  app.use((req, res) => {
+    logger.warn('404 Not Found', {
+      url: req.originalUrl,
+      method: req.method,
+      ip: req.ip
+    });
+
+    res.status(404).json({
+      error: 'Not Found',
+      message: `Endpoint ${req.method} ${req.originalUrl} not found`,
+      availableEndpoints: {
+        api: '/api',
+        auth: '/api/auth',
+        health: '/api/health'
+      }
+    });
+  });
+
+  // Global error handler
+  app.use((err, req, res, next) => {
+    logger.error('Unhandled error', {
+      error: err.message,
+      stack: err.stack,
+      url: req.originalUrl,
+      method: req.method
+    });
+
+    // Don't expose error details in production
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+
+    res.status(err.status || 500).json({
+      error: 'Internal Server Error',
+      message: isDevelopment ? err.message : 'An unexpected error occurred',
+      ...(isDevelopment && { stack: err.stack })
+    });
+  });
+
+  return app;
+};
+
+const app = createApp();
+
+logger.info('Server initialized', {
+  nodeEnv: process.env.NODE_ENV,
+  port: process.env.PORT
+});
+
+// Export the app for use in Vercel serverless functions
+export default app;
+
+// Only start the server if this is run directly (not imported)
+if (typeof window === 'undefined' && import.meta.url === `file://${process.argv[1]}`) {
+  const port = process.env.PORT || 8000;
+  app.listen(port, () => {
+    logger.info('Server started', {
+      port,
+      environment: process.env.NODE_ENV,
+      baseURL: process.env.BETTER_AUTH_URL
+    });
+  });
+}
