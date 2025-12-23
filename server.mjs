@@ -89,29 +89,8 @@ const createApp = () => {
   // Trust proxy (required for rate limiting and IP detection behind Vercel)
   app.set('trust proxy', 1);
 
-  // Security headers using helmet
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-      },
-    },
-    hsts: {
-      maxAge: 31536000, // 1 year
-      includeSubDomains: true,
-      preload: true
-    },
-    frameguard: {
-      action: 'deny' // Prevent clickjacking
-    },
-    noSniff: true, // Prevent MIME type sniffing
-    xssFilter: true, // Enable XSS filter
-  }));
-
-  // CORS middleware with dynamic origin validation
+  // CRITICAL: CORS middleware MUST be applied BEFORE helmet
+  // This ensures CORS headers are set before any other security headers
   // CRITICAL: This configuration allows cross-domain authentication to work on Vercel
   app.use(cors({
     origin: corsOriginValidator,
@@ -152,6 +131,28 @@ const createApp = () => {
     ],
     maxAge: 86400,
     optionsSuccessStatus: 200
+  }));
+
+  // Security headers using helmet (AFTER CORS)
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true
+    },
+    frameguard: {
+      action: 'deny' // Prevent clickjacking
+    },
+    noSniff: true, // Prevent MIME type sniffing
+    xssFilter: true, // Enable XSS filter
   }));
 
   // Request logging
