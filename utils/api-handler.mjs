@@ -111,11 +111,24 @@ const createRouter = () => {
   /**
    * PUT /api/user/profile
    * Update user profile (requires authentication)
+   * SECURITY: userId is ALWAYS taken from session, NEVER from request body
    */
   router.put('/user/profile', requireAuth, async (req, res) => {
     try {
+      // CRITICAL: Extract userId from authenticated session only
       const userId = req.user.id;
+
+      // SECURITY: Explicitly ignore userId from request body (if sent)
       const { skillLevel, softwareBackground, hardwareBackground, learningGoal } = req.body;
+
+      // SECURITY CHECK: If userId is in body, log warning but ignore it
+      if (req.body.userId && req.body.userId !== userId) {
+        logger.warn('Attempted userId manipulation in profile update', {
+          sessionUserId: userId,
+          attemptedUserId: req.body.userId,
+          ip: req.ip
+        });
+      }
 
       // Validate at least one field is provided
       if (!skillLevel && !softwareBackground && !hardwareBackground && !learningGoal) {
