@@ -41,12 +41,13 @@ function corsOriginValidator(origin, callback) {
   const PRODUCTION_FRONTEND = 'https://physical-ai-and-humanoid-robotics-t-lake.vercel.app';
 
   // Get allowed origins from env with production fallback
+  // CRITICAL: Remove trailing slashes (common mistake in env vars)
   let allowedOrigins = [];
 
   if (process.env.ALLOWED_ORIGINS) {
-    allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+    allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim().replace(/\/$/, ''));
   } else if (process.env.FRONTEND_URL) {
-    allowedOrigins = [process.env.FRONTEND_URL];
+    allowedOrigins = [process.env.FRONTEND_URL.replace(/\/$/, '')];
   } else {
     // CRITICAL: Fallback to production URL if env vars not set
     allowedOrigins = [PRODUCTION_FRONTEND];
@@ -63,8 +64,11 @@ function corsOriginValidator(origin, callback) {
     allowedOrigins.push('http://localhost:3001');
   }
 
+  // Normalize origin (remove trailing slash if present)
+  const normalizedOrigin = origin.replace(/\/$/, '');
+
   // Check if origin is allowed
-  if (allowedOrigins.includes(origin)) {
+  if (allowedOrigins.includes(normalizedOrigin)) {
     callback(null, true);
   } else {
     logger.warn('CORS blocked request', {

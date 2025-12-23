@@ -8,11 +8,15 @@ export default async function handler(req, res) {
   const PRODUCTION_FRONTEND = 'https://physical-ai-and-humanoid-robotics-t-lake.vercel.app';
 
   // Check if origin is allowed
+  // CRITICAL: Remove trailing slashes from allowed origins (common mistake in env vars)
   const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : [process.env.FRONTEND_URL || PRODUCTION_FRONTEND];
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim().replace(/\/$/, ''))
+    : [process.env.FRONTEND_URL || PRODUCTION_FRONTEND].map(o => o.replace(/\/$/, ''));
 
-  const isAllowedOrigin = allowedOrigins.includes(origin) || !origin;
+  // Also normalize the incoming origin (remove trailing slash if present)
+  const normalizedOrigin = origin.replace(/\/$/, '');
+
+  const isAllowedOrigin = allowedOrigins.includes(normalizedOrigin) || !origin;
 
   if (isAllowedOrigin && origin) {
     // Set CORS headers
