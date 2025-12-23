@@ -29,6 +29,7 @@ import createApiRouter from './utils/api-handler.mjs';
 /**
  * CORS origin validator
  * Supports multiple origins from ALLOWED_ORIGINS env variable
+ * CRITICAL: Includes hardcoded production URLs as fallback for Vercel deployment
  */
 function corsOriginValidator(origin, callback) {
   // Allow requests with no origin (mobile apps, Postman, etc.)
@@ -36,16 +37,45 @@ function corsOriginValidator(origin, callback) {
     return callback(null, true);
   }
 
-  // Get allowed origins from env
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : [process.env.FRONTEND_URL];
+  // Hardcoded production frontend URL as fallback
+  const PRODUCTION_FRONTEND = 'https://physical-ai-and-humanoid-robotics-t-lake.vercel.app';
+
+  // Get allowed origins from env with production fallback
+  let allowedOrigins = [];
+
+  if (process.env.ALLOWED_ORIGINS) {
+    allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+  } else if (process.env.FRONTEND_URL) {
+    allowedOrigins = [process.env.FRONTEND_URL];
+  } else {
+    // CRITICAL: Fallback to production URL if env vars not set
+    allowedOrigins = [PRODUCTION_FRONTEND];
+    logger.warn('CORS: Using hardcoded production frontend URL as fallback', {
+      origin,
+      fallback: PRODUCTION_FRONTEND
+    });
+  }
+
+  // Also always include localhost for development
+  if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:3002');
+    allowedOrigins.push('http://localhost:3000');
+    allowedOrigins.push('http://localhost:3001');
+  }
 
   // Check if origin is allowed
   if (allowedOrigins.includes(origin)) {
     callback(null, true);
   } else {
-    logger.warn('CORS blocked request', { origin });
+    logger.warn('CORS blocked request', {
+      origin,
+      allowedOrigins,
+      envVarsSet: {
+        ALLOWED_ORIGINS: !!process.env.ALLOWED_ORIGINS,
+        FRONTEND_URL: !!process.env.FRONTEND_URL,
+        NODE_ENV: process.env.NODE_ENV
+      }
+    });
     callback(new Error('Not allowed by CORS'));
   }
 }
@@ -137,6 +167,37 @@ const createApp = () => {
       status: 'running',
       version: '2.0.0',
       documentation: '/api'
+    });
+  });
+
+  // CORS debug endpoint - helps diagnose CORS issues in production
+  app.get('/cors-debug', (req, res) => {
+    const origin = req.get('Origin');
+    const PRODUCTION_FRONTEND = 'https://physical-ai-and-humanoid-robotics-t-lake.vercel.app';
+
+    let allowedOrigins = [];
+    if (process.env.ALLOWED_ORIGINS) {
+      allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+    } else if (process.env.FRONTEND_URL) {
+      allowedOrigins = [process.env.FRONTEND_URL];
+    } else {
+      allowedOrigins = [PRODUCTION_FRONTEND];
+    }
+
+    res.json({
+      corsDebug: {
+        requestOrigin: origin || 'no-origin',
+        allowedOrigins: allowedOrigins,
+        isOriginAllowed: origin ? allowedOrigins.includes(origin) : 'no-origin-provided',
+        environmentVariables: {
+          ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'not-set',
+          FRONTEND_URL: process.env.FRONTEND_URL || 'not-set',
+          NODE_ENV: process.env.NODE_ENV || 'not-set',
+          BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || 'not-set'
+        },
+        productionFallback: PRODUCTION_FRONTEND,
+        timestamp: new Date().toISOString()
+      }
     });
   });
 
