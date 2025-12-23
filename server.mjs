@@ -82,12 +82,46 @@ const createApp = () => {
   }));
 
   // CORS middleware with dynamic origin validation
+  // CRITICAL: This configuration allows cross-domain authentication to work on Vercel
   app.use(cors({
     origin: corsOriginValidator,
-    credentials: true,  // CRITICAL: Allow cookies to be sent
+    credentials: true,  // CRITICAL: Allow cookies to be sent cross-domain
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset']
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Cookie'  // Explicitly allow Cookie header
+    ],
+    exposedHeaders: [
+      'Set-Cookie',  // Explicitly expose Set-Cookie header
+      'RateLimit-Limit',
+      'RateLimit-Remaining',
+      'RateLimit-Reset'
+    ],
+    maxAge: 86400,  // Cache preflight for 24 hours (reduces OPTIONS requests)
+    preflightContinue: false,  // Pass preflight response to next handler
+    optionsSuccessStatus: 200  // CRITICAL: Return 200 for OPTIONS (some legacy browsers use 204)
+  }));
+
+  // CRITICAL: Explicit OPTIONS handler for all routes
+  // This ensures preflight requests always get proper CORS headers
+  app.options('*', cors({
+    origin: corsOriginValidator,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Cookie'
+    ],
+    maxAge: 86400,
+    optionsSuccessStatus: 200
   }));
 
   // Request logging
