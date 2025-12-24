@@ -11,11 +11,20 @@ import { validateEnv } from './lib/env-validator.mjs';
 import { logger, requestLogger, setupErrorHandlers } from './lib/logger.mjs';
 
 // Validate environment before starting
+// CRITICAL: On Vercel serverless, don't exit on validation errors
+// Log warnings but allow app to start with fallback values
 try {
   validateEnv();
 } catch (error) {
-  console.error(error.message);
-  process.exit(1);
+  // In serverless (Vercel), log error but don't exit
+  // Fallback values will be used from the code
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    console.warn('Environment validation failed, using fallbacks:', error.message);
+  } else {
+    // In local development, fail fast
+    console.error(error.message);
+    process.exit(1);
+  }
 }
 
 // Setup error handlers
