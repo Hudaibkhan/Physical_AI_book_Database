@@ -61,6 +61,93 @@ const createRouter = () => {
   });
 
   /**
+   * POST /api/user/profile/create
+   * Create initial user profile after signup (requires authentication)
+   * SECURITY: userId from session only, profile fields from request body
+   */
+  router.post('/user/profile/create', requireAuth, async (req, res) => {
+    try {
+      // CRITICAL: userId from authenticated session only
+      const userId = req.user.id;
+      const { skillLevel, softwareBackground, hardwareBackground, learningGoal } = req.body;
+
+      // Check if profile already exists
+      const existing = await query(
+        'SELECT * FROM user_profiles WHERE "userId" = $1',
+        [userId]
+      );
+
+      if (existing.rows.length > 0) {
+        return res.status(409).json({
+          error: 'Profile already exists',
+          message: 'User profile has already been created. Use PUT /api/user/profile to update it.',
+          profile: {
+            userId: existing.rows[0].userId,
+            skillLevel: existing.rows[0].skill_level,
+            softwareBackground: existing.rows[0].software_background,
+            hardwareBackground: existing.rows[0].hardware_background,
+            learningGoal: existing.rows[0].learning_goal
+          }
+        });
+      }
+
+      // Create new profile
+      await query(`
+        INSERT INTO user_profiles (
+          "userId",
+          skill_level,
+          software_background,
+          hardware_background,
+          learning_goal,
+          "createdAt",
+          "updatedAt"
+        )
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+      `, [
+        userId,
+        skillLevel || null,
+        softwareBackground || null,
+        hardwareBackground || null,
+        learningGoal || null
+      ]);
+
+      logger.info('User profile created', { userId });
+
+      // Fetch and return the created profile
+      const result = await query(
+        'SELECT * FROM user_profiles WHERE "userId" = $1',
+        [userId]
+      );
+
+      const profile = result.rows[0];
+
+      res.status(201).json({
+        success: true,
+        message: 'Profile created successfully',
+        profile: {
+          userId: profile.userId,
+          skillLevel: profile.skill_level,
+          softwareBackground: profile.software_background,
+          hardwareBackground: profile.hardware_background,
+          learningGoal: profile.learning_goal,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt
+        }
+      });
+    } catch (error) {
+      logger.error('Profile creation error', {
+        error: error.message,
+        userId: req.user.id
+      });
+
+      res.status(500).json({
+        error: 'Failed to create profile',
+        message: 'An error occurred while creating your profile'
+      });
+    }
+  });
+
+  /**
    * GET /api/user/profile
    * Get user profile (requires authentication)
    */
@@ -111,24 +198,11 @@ const createRouter = () => {
   /**
    * PUT /api/user/profile
    * Update user profile (requires authentication)
-   * SECURITY: userId is ALWAYS taken from session, NEVER from request body
    */
   router.put('/user/profile', requireAuth, async (req, res) => {
     try {
-      // CRITICAL: Extract userId from authenticated session only
       const userId = req.user.id;
-
-      // SECURITY: Explicitly ignore userId from request body (if sent)
       const { skillLevel, softwareBackground, hardwareBackground, learningGoal } = req.body;
-
-      // SECURITY CHECK: If userId is in body, log warning but ignore it
-      if (req.body.userId && req.body.userId !== userId) {
-        logger.warn('Attempted userId manipulation in profile update', {
-          sessionUserId: userId,
-          attemptedUserId: req.body.userId,
-          ip: req.ip
-        });
-      }
 
       // Validate at least one field is provided
       if (!skillLevel && !softwareBackground && !hardwareBackground && !learningGoal) {
