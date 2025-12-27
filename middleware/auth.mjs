@@ -17,14 +17,30 @@ import { logger } from '../lib/logger.mjs';
  */
 export async function requireAuth(req, res, next) {
   try {
+    // DEBUG: Log incoming request details for session troubleshooting
+    logger.debug('requireAuth: Incoming request', {
+      url: req.originalUrl,
+      hasCookieHeader: !!req.headers.cookie,
+      cookieHeader: req.headers.cookie ? req.headers.cookie.substring(0, 100) + '...' : 'none',
+      hasAuthHeader: !!req.headers.authorization
+    });
+
     // Get session from Better Auth using request headers
     const session = await auth.api.getSession({ headers: req.headers });
+
+    // DEBUG: Log session result
+    logger.debug('requireAuth: Session result', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userId: session?.user?.id || 'none'
+    });
 
     if (!session || !session.user) {
       logger.warn('Unauthorized access attempt', {
         url: req.originalUrl,
         ip: req.ip,
-        userAgent: req.get('user-agent')
+        userAgent: req.get('user-agent'),
+        cookiePresent: !!req.headers.cookie
       });
 
       return res.status(401).json({
